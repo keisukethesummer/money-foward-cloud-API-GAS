@@ -1,0 +1,120 @@
+/*----------------------------------------------------------------------------------------*/
+/* マネーフォワード請求書API情報 */
+/* ClientID
+* 
+*/
+
+/* Client Secret 
+* 
+*/
+/*-----------------------------------------------------------------------------------------*/
+
+/***************/
+/*   関数定義   */
+/***************/
+
+/*----------------------------------------------------------*/
+/* 関数名:   getCheckRows                                    */
+/* 処理概要: チェックが入っている行の情報取得                      */
+/* 引数: data(スプレッドシート全体のデータ)                      */
+/* 戻り値: 2次元配列(請求日・取引先ID・部門ID・タイトル・品目ID)    */
+/*----------------------------------------------------------*/
+function getCheckedRows(data)
+{
+  let result = [];                                                      /* チェックされた行の情報を格納する配列 */
+
+  /* チェックボックスONの行の情報取得 */
+  for ( let i = 5; i < data.length; i++ ) /* データは6行目から */
+  {
+    if( true == data[i][0] ) /* A列チェックONの場合 */
+    {
+      result.push(
+        [
+          data[i][2],   /* 請求日(C列) */
+          data[i][6],   /* 取引先ID(G列) */
+          data[i][15],  /* 部門ID(P列) */
+          data[i][8],   /* タイトル(I列) */
+          data[i][11],  /* 品目ID(K列) */
+          data[i][1],  /* 発行状況(N列) */
+          data[i][13],  /* 税込金額 */
+          data[i][18],  /* 備考 */
+          data[i][19],  /* 振込先口座 */
+          i             /* 行目 */
+        ]);
+    }
+  }
+  
+  /* debug code */
+  // Logger.log(result);
+  /* debug code end */
+  
+  return result;
+}
+
+/*-----------------------------------------------------------------------*/
+/* 関数名:   CreateNewInvoicesFromCheckedRow                              */
+/* 処理概要: マネーフォワードクラウドに請求書を新規作成(1行につき1枚)し、明細を追加  */
+/* 引数:    無し                                                           */
+/* 戻り値:   無し                                                          */
+/* その他: トリガ:「請求書送付管理」シート内の「請求書発行」ボタン                 */
+/*------------------------------------------------------------------------*/
+function CreateNewInvoicesFromCheckedRow()
+{
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();   /* スプレッドシート・シート取得 */
+  const data = sheet.getDataRange().getValues();                          /* データ取得 */
+
+  let checked_data;
+  let invoice_id;
+  let billing_date_obj;
+  let customer_id;
+  let department_id;
+  let title;
+  let item_id;
+  let create_status
+  let price;
+  let note;
+  let payment_condition;
+  let i;
+
+  /* 認証 */
+  auth();
+
+  /* スプレッドシート内の、チェックが入った行のデータ取得 */
+  checked_data = getCheckedRows(data);
+
+  for (i = 0; i < checked_data.length; i++)
+  {
+    billing_date_obj = checked_data[i][0];
+    customer_id = checked_data[i][1]
+    department_id = checked_data[i][2];
+    title = checked_data[i][3];
+    item_id = checked_data[i][4];
+    create_status = checked_data[i][5];
+    price = checked_data[i][6];
+    note = '誠に恐れ入りますが、振込手数料はご負担頂きますようにお願いいたします。\n\n' + checked_data[i][7];
+    payment_condition = checked_data[i][8]
+    row = checked_data[i][9];
+
+    /* debug code */
+    // Logger.log("test:" + checked_data[i]);
+    /* debug code end */
+
+    /* 新規請求書作成(戻り値:正常: 請求書ID、エラー: null) */
+    invoice_id = createNewInvoice_(department_id, title, customer_id, billing_date_obj,note,payment_condition);
+
+    if (null !== invoice_id)
+    {
+      /* 作成した請求書へ明細行の追加*/
+      attachItems_(invoice_id, item_id,price);  /* 第1引数:請求書ID、第2引数:品目ID、第3引数:金額 */
+
+      /* 発行状況更新 */
+      sheet.getRange(row + 1, 2).setValue("発行済み");
+    }
+  }
+}
+
+
+
+
+
+
