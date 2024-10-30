@@ -1,0 +1,131 @@
+/***********************************************************/
+/* 処理概要: マネーフォワードクラウド上の取引先マスタデータを取得    */
+/* 引数: 無し                                               */
+/* 戻り値: 取引先JSONデータ                                   */
+/***********************************************************/
+function getPartnersWithPage(page)
+{
+  let options;
+  let query_params;
+  let query_string;
+  let url;
+
+  options =
+  {
+    method: 'GET',
+    muteHttpExceptions: true,
+    headers:
+    {
+      accept: 'application/json',
+      Authorization: 'Bearer ' + getService_().getAccessToken(),
+    },
+  };
+
+  query_params =
+  {
+    page: page /* ページ番号を指定 */
+  };
+
+  query_string = Object.keys(query_params)
+    .map(function(key)
+    {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(query_params[key]);
+    })
+    .join('&');
+  
+  url = PARTNERS_MASTER_URL + '?' + query_string;
+
+  /* debug code */
+  // Logger.log(UrlFetchApp.fetch(url, options));
+  // let test = UrlFetchApp.fetch(url, options);
+  // let obj = JSON.parse(test);
+  // console.log("TEST1:", obj.data[0]);
+  /* debug code end*/
+
+  return UrlFetchApp.fetch(url, options); /* JSONデータをコール元へ返す */
+}
+
+/*******************************************/
+/* 処理概要: データをスプレッドシートに追加      */
+/* 引数: データ(json)                        */
+/* 戻り値: 無し                              */
+/*******************************************/
+function pushPartnersToSpreadSheet(data)
+{
+  let sheet;                    /* データを入力するシート */
+  let partner_name;             /* 取引先名 */
+  let partner_id;               /* 取引先ID(未実装) */
+  let department_name;          /* 部門名(未実装) */
+  let department_id;            /* 部門ID */
+  let existing_department_ids;  /* 入力済みの部門ID */
+  let i;
+  let j;
+
+  sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("取引先マスタ");
+
+  /* 入力済みの部門IDを取得 */
+  existing_department_ids = sheet.getRange("D2:D").getValues().flat().filter(String); /* flat:2次元配列を1次元に変換。filter(String):空セル除外 */
+
+  for (i = 0; i < data.length; i++)
+  {
+    partner_name = data[i].name;
+    partner_id = data[i].id;
+    department_name = data[i].departments.name;
+
+    for (j = 0; j < data[i].departments.length; j++)  /* 1つの取引先内の全ての部門IDを取得 */
+    {
+      department_id = data[i].departments[j].id;
+      department_name = data[i].departments[j].person_dept;
+
+      /* スプレッドシートに、部門IDが重複していないデータのみ入力 */
+      if (false == existing_department_ids.includes(department_id))
+      {
+        sheet.appendRow([partner_name, partner_id, department_name, department_id]);
+      }
+    }
+  }
+}
+
+/************************************************/
+/* 処理概要: 取引先データをスプレッドシートに追加      */
+/* 引数: 無し                                    */
+/* 戻り値: 無し                                  */
+/************************************************/
+function setAllPartners()
+{
+  auth();
+
+  let page;             /* 取引先マスタのページ番号 */
+  let json_data;        /* JSONデータ */
+  let obj;              /* JSONデータから変換したオブジェクト */
+  let data_value;       /* データのペイロード部分 */
+
+  page = 1;
+
+  do
+  {
+    /* ページごとの取引先データ(JSON)取得 */
+    json_data = getPartnersWithPage(page);
+
+    /* JSONをオブジェクトに変換 */
+    obj = JSON.parse(json_data.getContentText()); 
+
+    /* オブジェクト内の'data'キーの値を取得 */
+    data_value = obj.data;
+
+    /* debug code */
+    // console.log("test1:", data_value[0]);
+    // console.log("test2:", data_value[99]);
+    // console.log("test3:", data_value[100]);
+    // console.log("test4:", obj.pagination);
+    /* debug cdoe end*/
+
+    /* スプレッドシートへ入力 */
+    pushPartnersToSpreadSheet(data_value);
+
+    page++;
+  }
+  /* 全ページ終わったか判定 */
+  while(page <= obj.pagination.total_pages);
+
+}
