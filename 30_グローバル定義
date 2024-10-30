@@ -1,0 +1,13 @@
+/*######################*/
+/*#       定数定義      #*/
+/*######################*/
+const SHEET_ID = '';        /* スプレッドシートのID */
+const PARTNERS_MASTER_URL = 'https://invoice.moneyforward.com/api/v3/partners'; /* マネーフォワードクラウドAPIの取引先マスタ用エンドポイント */
+const ITEMS_MASTER_URL = 'https://invoice.moneyforward.com/api/v3/items'; /* マネーフォワードクラウドAPIの品目マスタ用エンドポイント */
+
+/*#######################*/
+/*#   グローバル変数定義   #*/
+/*#######################*/
+let g_sheet = SpreadsheetApp.openById(SHEET_ID);    /* スプレッドシート */
+
+
