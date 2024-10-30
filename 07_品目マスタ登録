@@ -1,0 +1,126 @@
+/****************************************************/
+/* 処理概要: 渡された品目データをスプレッドシートに登録     */
+/* 引数: 品目データ　　  　　　　　　　　　               */
+/* 戻り値: 無し                         　　          */
+/****************************************************/
+function pushItem(return_value)
+{
+  let push_sheet;    /* 入力するスプレッドシート */
+  let push_data;     /* 入力するデータ */
+  let item_code;     /* 品目コード */
+  let item_name;     /* 品名 */
+  let item_id;       /* 品目ID */
+
+  push_sheet = g_sheet.getSheetByName("品目マスタ");
+
+  item_code = return_value.code;
+  item_name = return_value.name;
+  item_id = return_value.id;
+
+  push_data = [item_code, item_name, item_id];
+
+  push_sheet.appendRow(push_data);
+}
+
+/************************************************************************************/
+/* 処理概要: フォームで送信された品目をマネーフォワードクラウドAPIに登録                       */
+/* 引数: Googleフォーム回答                                                            */
+/* 戻り値: 無し                                                                       */
+/************************************************************************************/
+function createItem(data)
+{
+  let payload;                        /* APIに送信するデータ */
+  let item_code;                      /* 品目コード */
+  let item_name;                      /* 品目名 */
+  let item_price;                     /* 単価 */
+  let item_quantity;                  /* 数量 */
+  let item_excise;                    /* 消費税 */
+  let item_is_deduct_withholding_tax; /* 源泉徴収有無 */
+  let options;                        /* APIに送信するオプション */
+  let return_value;                   /* 登録APIの戻り値(新しい品目のJSONデータ) */
+
+  auth(); /* 認証 */
+
+  /* データ格納 */
+  item_name = data[0];
+  item_code = data[1];
+  item_price = data[2];
+  item_quantity = data[3];
+
+  if("10%" == data[4])
+  {
+    item_excise = "ten_percent";
+  }
+  else if("8%(軽減税率)" == data[4])
+  {
+    item_excise = "eight_percent_as_reduced_tax_rate";
+  }
+  else if("8%" == data[4])
+  {
+    item_excise = "eight_percent";
+  }
+  else if("5%" == data[4])
+  {
+    item_excise = "five_percent";
+  }
+  else if("免税" == data[4])
+  {
+    item_excise = "tax_exemption";
+  }
+  else if("非課税" == data[4])
+  {
+    item_excise = "non_taxable";
+  }
+  else if("不課税" == data[4])
+  {
+    item_excise = "untaxable";
+  }
+
+  if("源泉徴収する" == data[5])   /* 事業者が個人事業主の場合。法人の場合null(未実装) */
+  {
+    item_is_deduct_withholding_tax = true;
+  }
+  else
+  {
+    item_is_deduct_withholding_tax = false;
+  }
+
+  item_unit = data[6];
+
+  payload =
+  {
+    "code": item_code,
+    "name": item_name,
+    "price": item_price,
+    "quantity": item_quantity,
+    "unit": item_unit,
+    "excise": item_excise,
+    "is_deduct_withholding_tax": item_is_deduct_withholding_tax,
+  };
+
+  options =
+  {
+    method: 'POST',
+    contentType: 'application/json',
+    muteHttpExceptions: false,
+    headers:
+    {
+      accept: 'application/json',
+      Authorization: 'Bearer ' + getService_().getAccessToken(),
+    },
+    payload: JSON.stringify(payload)
+  }
+
+  /* マネーフォワードクラウドAPIの取引先マスタに登録 */
+  return_value = JSON.parse(UrlFetchApp.fetch(ITEMS_MASTER_URL,options));
+
+  /* debug code */
+  // Logger.log("test:");
+  // Logger.log(new_item);
+  /* debug code end */
+
+  /* スプレッドシートに登録 */
+  pushItem(return_value);
+}
+
+
