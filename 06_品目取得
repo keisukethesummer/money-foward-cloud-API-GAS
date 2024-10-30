@@ -1,0 +1,123 @@
+/***********************************************************/
+/* 処理概要: マネーフォワードクラウド上の品目マスタデータを取得     */
+/* 引数: 無し                                               */
+/* 戻り値: 品目JSONデータ                                    */
+/***********************************************************/
+function getItemsWithPage(page)
+{
+  let options;
+  let query_params;
+  let query_string;
+  let url;
+
+  options =
+  {
+    method: 'GET',
+    muteHttpExceptions: true,
+    headers:
+    {
+      accept: 'application/json',
+      Authorization: 'Bearer ' + getService_().getAccessToken(),
+    },
+  };
+
+  query_params =
+  {
+    page: page /* ページ番号を指定 */
+  };
+
+  query_string = Object.keys(query_params)
+    .map(function(key)
+    {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(query_params[key]);
+    })
+    .join('&');
+  
+  url = ITEMS_MASTER_URL + '?' + query_string;
+
+  /* debug code */
+  // Logger.log(UrlFetchApp.fetch(url, options));
+  // let test = UrlFetchApp.fetch(url, options);
+  // let obj = JSON.parse(test);
+  // console.log("TEST1:", obj.data[0]);
+  /* debug code end*/
+
+  return UrlFetchApp.fetch(url, options); /* JSONデータをコール元へ返す */
+}
+
+/*******************************************/
+/* 処理概要: データをスプレッドシートに追加      */
+/* 引数: データ(json)                        */
+/* 戻り値: 無し                              */
+/*******************************************/
+function pushItemsToSpreadSheet(data)
+{
+  let sheet;              /* データを入力するシート */
+  let item_code;          /* 品目コード */
+  let item_name;          /* 品名 */
+  let item_id;            /* 品目ID */
+  let existing_item_ids;  /* 入力済みの品目ID */
+  let i;
+
+  sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("品目マスタ");
+
+  /* 入力済みの部門IDを取得 */
+  existing_item_ids = sheet.getRange("C2:C").getValues().flat().filter(String); /* flat:2次元配列を1次元に変換。filter(String):空セル除外 */
+
+  for (i = 0; i < data.length; i++)
+  {
+    item_code = data[i].code;
+    item_name = data[i].name;
+    item_id = data[i].id;
+
+    /* スプレッドシートに、品目IDが重複していないデータのみ入力 */
+    if (false == existing_item_ids.includes(item_id))
+    {
+      sheet.appendRow([item_code, item_name, item_id]);
+    }
+  }
+}
+
+/**********************************************/
+/* 処理概要: 品目データをスプレッドシートに追加      */
+/* 引数: 無し                                   */
+/* 戻り値: 無し                                 */
+/**********************************************/
+function setAllItems()
+{
+  auth();
+
+  let page;             /* 取引先マスタのページ番号 */
+  let json_data;        /* JSONデータ */
+  let obj;              /* JSONデータから変換したオブジェクト */
+  let data_value;       /* データのペイロード部分 */
+
+  page = 1;
+
+  do
+  {
+    /* ページごとの取引先データ(JSON)取得 */
+    json_data = getItemsWithPage(page);
+
+    /* JSONをオブジェクトに変換 */
+    obj = JSON.parse(json_data.getContentText()); 
+
+    /* オブジェクト内の'data'キーの値を取得 */
+    data_value = obj.data;
+
+    /* debug code */
+    // console.log("test1:", data_value[0]);
+    // console.log("test2:", data_value[99]);
+    // console.log("test3:", data_value[100]);
+    // console.log("test4:", obj.pagination);
+    /* debug cdoe end*/
+
+    /* スプレッドシートへ入力 */
+    pushItemsToSpreadSheet(data_value);
+
+    page++;
+  }
+  /* 全ページ終わったか判定 */
+  while(page <= obj.pagination.total_pages);
+
+}
