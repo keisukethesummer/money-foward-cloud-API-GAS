@@ -1,0 +1,98 @@
+/****************************************************/
+/* 処理概要: 渡された取引先データをスプレッドシートに登録    */
+/* 引数: 取引先データ　　　　　　　　　　　               */
+/* 戻り値: 無し                         　　          */
+/****************************************************/
+function pushPartner(return_value)
+{
+  let push_sheet;       /* 入力するスプレッドシート */
+  let push_data;        /* 入力するデータ */
+  let partner_name;     /* 取引先名 */
+  let partner_id;       /* 取引先ID */
+  let department_name;  /* 部門名 */
+  let department_id;    /* 部門ID */
+  let i;
+
+  push_sheet = g_sheet.getSheetByName("取引先マスタ");
+
+  for(i = 0; i < return_value.departments.length; i++)
+  {
+    partner_name = return_value.name;
+    partner_id = return_value.id;
+    department_name = return_value.departments[i].person_dept;
+    department_id = return_value.departments[i].id;
+
+    push_data = [partner_name, partner_id, department_name, department_id];
+
+    push_sheet.appendRow(push_data);
+  }
+}
+
+/**************************************************************************************/
+/* 処理概要: フォームで送信された取引先をマネーフォワードクラウドAPIに登録                       */
+/* 引数: Googleフォーム回答                                                              */
+/* 戻り値: 無し                                                                         */
+/**************************************************************************************/
+function createPartner(data)
+{
+  let payload;          /* APIに送信するデータ */
+  let partner_name;     /* 取引先名 */
+  let departments = []; /* 部門名データテーブル */
+  let department1;      /* 部門名1 */
+  let department2;      /* 部門名2 */
+  let department3;      /* 部門名3 */
+  let options;          /* APIに送信するオプション */
+  let return_value;     /* 登録APIの戻り値(新しい取引先のJSONデータ) */
+
+  auth(); /* 認証 */
+
+  partner_name = data[2];
+
+  if(3 < data.length) /* 部門名1を追加 */
+  {
+    department1 = { person_dept: data[3] };
+    departments.push(department1);
+  }
+  if(4 < data.length) /* 部門名2を追加 */
+  {
+    department2 = { person_dept: data[4] };
+    departments.push(department2);
+  }
+  if(5 < data.length) /* 部門名3を追加 */
+  {
+    department3 = { person_dept: data[5] };
+    departments.push(department3);
+  }
+
+  payload =
+  {
+    "name": partner_name,
+    "departments": departments
+  };
+
+  options =
+  {
+    method: 'POST',
+    contentType: 'application/json',
+    muteHttpExceptions: false,
+    headers:
+    {
+      accept: 'application/json',
+      Authorization: 'Bearer ' + getService_().getAccessToken(),
+    },
+    payload: JSON.stringify(payload)
+  }
+
+  /* マネーフォワードクラウドAPIの取引先マスタに登録 */
+  return_value = JSON.parse(UrlFetchApp.fetch(PARTNERS_MASTER_URL,options));
+
+  /* debug code */
+  // Logger.log("test:");
+  // Logger.log(new_partner);
+  /* debug code end */
+
+  /* スプレッドシートに登録 */
+  pushPartner(return_value);
+}
+
+
