@@ -1,0 +1,39 @@
+
+/******************************************************/
+/* 処理概要: 送信されたフォームの切り分け                 　*/
+/* 引数: 回答データ[回答日時, 質問1の回答, 質問2の回答, ...] */
+/* 戻り値: 無し                                         */
+/******************************************************/
+function submitForm(e)
+{
+  let filtered_response;  /* 整えたデータ */
+  let service;            /* 最初の質問の回答 */
+
+  /* 最初の質問の回答 */
+  service = e.values[1];
+
+  /* 取引先登録の場合 */
+  if("取引先登録" == service)
+  {
+    /* 不要な回答データを除去 */
+    filtered_response = e.values.slice(0, 8);
+    /* 空白を除去 */
+    filtered_response = filtered_response.filter(item => item !== "");
+
+    /* マネーフォワードクラウドAPIの取引先マスタに登録 */
+    createPartner(filtered_response);
+  }
+  else if("品目登録")
+  {
+    /* 不要な回答データを除去 */
+    filtered_response = e.values.slice(8, 15);
+    Logger.log(filtered_response);
+    
+    /* マネーフォワードクラウドAPIの品目マスタに登録 */
+    createItem(filtered_response);
+  }
+  else
+  {
+    /* 未実装 */
+  }
+}
